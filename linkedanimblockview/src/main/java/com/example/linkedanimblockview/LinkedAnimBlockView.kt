@@ -203,4 +203,27 @@ class LinkedAnimBlockView (ctx : Context) : View(ctx) {
             curr.startUpdating(startcb)
         }
     }
+
+    data class Renderer (var view : LinkedAnimBlockView) {
+
+        private val linkedAnimBlock : LinkedAnimBlock = LinkedAnimBlock(0)
+
+        private val animator : Animator = Animator(view)
+
+        fun render(canvas : Canvas, paint : Paint) {
+            canvas.drawColor(Color.parseColor("#212121"))
+            linkedAnimBlock.draw(canvas, paint)
+            animator.animate {
+                linkedAnimBlock.update {
+                    animator.stop()
+                }
+            }
+        }
+
+        fun handleTap() {
+            linkedAnimBlock.startUpdating {
+                animator.start()
+            }
+        }
+    }
 }
