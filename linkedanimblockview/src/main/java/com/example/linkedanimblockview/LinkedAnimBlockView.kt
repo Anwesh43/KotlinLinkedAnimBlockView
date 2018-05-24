@@ -10,6 +10,13 @@ import android.view.MotionEvent
 import android.graphics.*
 import java.util.*
 
+fun PointF.getMin() : Float {
+    return Math.min(x, y)
+}
+val getDimension : (Canvas) -> PointF = {canvas -> PointF(canvas.width.toFloat(), canvas.height.toFloat()) }
+
+val getSize : (Canvas) -> Float = {canvas -> getDimension(canvas).getMin()/3}
+
 class LinkedAnimBlockView (ctx : Context) : View(ctx) {
 
     private val paint : Paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -82,8 +89,8 @@ class LinkedAnimBlockView (ctx : Context) : View(ctx) {
 
         var prev : LABNode? = null
 
-        var cb : ((Canvas, Paint) -> Unit)? = null
-        fun addNeighbor(cbs : List<(Canvas, Paint) -> Unit>) {
+        var cb : ((Canvas, Paint, Float) -> Unit)? = null
+        fun addNeighbor(cbs : List<(Canvas, Paint, Float) -> Unit>) {
             takeIf{cbs.size > 0}.apply {
                 cb = cbs[0]
                 takeIf { cbs.size > 1 }.apply {
@@ -104,7 +111,11 @@ class LinkedAnimBlockView (ctx : Context) : View(ctx) {
         }
 
         fun draw(canvas : Canvas, paint : Paint) {
-            cb?.invoke(canvas, paint)
+            prev?.draw(canvas, paint)
+            canvas.save()
+            canvas.translate(getDimension(canvas).x/2, getDimension(canvas).y/2)
+            cb?.invoke(canvas, paint, state.scale)
+            canvas.restore()
         }
 
         fun getNext(dir : Int, cb : () -> Unit) : LABNode {
@@ -117,6 +128,79 @@ class LinkedAnimBlockView (ctx : Context) : View(ctx) {
             }
             cb()
             return this
+        }
+    }
+
+    data class LinkedAnimBlock(var i : Int) {
+
+        private var curr : LABNode = LABNode(0)
+
+        private var dir : Int = 1
+        init {
+            curr.addNeighbor(createDrawFunctions())
+        }
+
+        fun createDrawFunctions() : List<(Canvas, Paint, Float) -> Unit> {
+            val drawCbs : ArrayList<(Canvas, Paint, Float) -> Unit> = ArrayList()
+
+            drawCbs.add {canvas, paint, scale ->
+                paint.color = Color.parseColor("#9E9E9E")
+                val size : Float = getSize(canvas) * scale
+                canvas.save()
+                canvas.drawRect(-size, -size, size, size, paint)
+                canvas.restore()
+            }
+
+            drawCbs.add { canvas, paint, scale ->
+                paint.color = Color.parseColor("#00695C")
+                val w : Float = getSize(canvas) * 0.4f
+                val h : Float = getSize(canvas) * 0.8f
+                for (i in 0..1) {
+                    canvas.save()
+                    canvas.translate(-getSize(canvas)/2,0f)
+                    canvas.scale(0f, 1f - 2 * i)
+                    canvas.drawRect(RectF(-w, -h, w, -h + (h) * scale), paint)
+                    canvas.restore()
+                }
+            }
+
+            val addCircleToCbs : (Int) -> Unit = { i ->
+                drawCbs.add { canvas, paint, scale ->
+                    paint.color = Color.parseColor("#00695C")
+                    val size : Float = getSize(canvas)
+                    val r : Float = size / 3
+                    val y : Float = -size / 2
+                    for (i in 0..1) {
+                        canvas.save()
+                        canvas.translate(size/2, y + size * i)
+                        canvas.drawArc(RectF(-r, -r, r, r), 0f, 360f * scale, true, paint)
+                        canvas.restore()
+                    }
+                }
+            }
+
+            for (i in 0..1) {
+                addCircleToCbs(i)
+            }
+
+            return drawCbs
+        }
+
+        fun draw(canvas : Canvas, paint : Paint) {
+            curr.draw(canvas, paint)
+        }
+
+        fun update(stopcb : (Float) -> Unit) {
+            curr.update({scale ->
+                curr = this.curr.getNext(dir) {
+                    this.dir *= -1
+                }
+                stopcb(scale)
+            })
+        }
+
+        fun startUpdating(startcb : () -> Unit) {
+            curr.startUpdating(startcb)
         }
     }
 }
