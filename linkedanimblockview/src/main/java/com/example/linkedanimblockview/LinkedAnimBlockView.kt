@@ -6,10 +6,11 @@ package com.example.linkedanimblockview
 
 import android.app.Activity
 import android.content.Context
+import android.content.pm.ActivityInfo
 import android.view.View
 import android.view.MotionEvent
 import android.graphics.*
-import java.util.*
+import kotlin.collections.ArrayList
 
 fun PointF.getMin() : Float {
     return Math.min(x, y)
@@ -93,13 +94,14 @@ class LinkedAnimBlockView (ctx : Context) : View(ctx) {
         var prev : LABNode? = null
 
         var cb : ((Canvas, Paint, Float) -> Unit)? = null
-        fun addNeighbor(cbs : List<(Canvas, Paint, Float) -> Unit>) {
-            takeIf{cbs.size > 0}.apply {
+        fun addNeighbor(cbs : ArrayList<(Canvas, Paint, Float) -> Unit>) {
+            if(cbs.isNotEmpty()) {
                 cb = cbs[0]
-                takeIf { cbs.size > 1 }.apply {
+                cbs.removeAt(0)
+                if (cbs.isNotEmpty()) {
                     next = LABNode(i +1)
                     next?.prev = this
-                    next?.addNeighbor(cbs.subList(1, cbs.size))
+                    next?.addNeighbor(cbs)
                 }
             }
         }
@@ -143,9 +145,8 @@ class LinkedAnimBlockView (ctx : Context) : View(ctx) {
             curr.addNeighbor(createDrawFunctions())
         }
 
-        fun createDrawFunctions() : List<(Canvas, Paint, Float) -> Unit> {
+        fun createDrawFunctions() : ArrayList<(Canvas, Paint, Float) -> Unit> {
             val drawCbs : ArrayList<(Canvas, Paint, Float) -> Unit> = ArrayList()
-
             drawCbs.add {canvas, paint, scale ->
                 paint.color = Color.parseColor("#9E9E9E")
                 val size : Float = getSize(canvas) * scale
@@ -156,15 +157,13 @@ class LinkedAnimBlockView (ctx : Context) : View(ctx) {
 
             drawCbs.add { canvas, paint, scale ->
                 paint.color = Color.parseColor("#00695C")
-                val w : Float = getSize(canvas) * 0.4f
-                val h : Float = getSize(canvas) * 0.8f
-                for (i in 0..1) {
-                    canvas.save()
-                    canvas.translate(-getSize(canvas)/2,0f)
-                    canvas.scale(0f, 1f - 2 * i)
-                    canvas.drawRect(RectF(-w, -h, w, -h + (h) * scale), paint)
-                    canvas.restore()
-                }
+                val size : Float = getSize(canvas)
+                val w : Float = size/3
+                val h : Float = size * 0.8f
+                canvas.save()
+                canvas.translate(-size/2, 0f)
+                canvas.drawRect(RectF(-w * scale, -h, w * scale, h), paint)
+                canvas.restore()
             }
 
             val addCircleToCbs : (Int) -> Unit = { i ->
@@ -173,12 +172,10 @@ class LinkedAnimBlockView (ctx : Context) : View(ctx) {
                     val size : Float = getSize(canvas)
                     val r : Float = size / 3
                     val y : Float = -size / 2
-                    for (i in 0..1) {
-                        canvas.save()
-                        canvas.translate(size/2, y + size * i)
-                        canvas.drawArc(RectF(-r, -r, r, r), 0f, 360f * scale, true, paint)
-                        canvas.restore()
-                    }
+                    canvas.save()
+                    canvas.translate(size/2, y + size * i)
+                    canvas.drawArc(RectF(-r, -r, r, r), 0f, 360f * scale, true, paint)
+                    canvas.restore()
                 }
             }
 
@@ -234,6 +231,7 @@ class LinkedAnimBlockView (ctx : Context) : View(ctx) {
         fun create(activity : Activity) : LinkedAnimBlockView {
             val view : LinkedAnimBlockView = LinkedAnimBlockView(activity)
             activity.setContentView(view)
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             return view
         }
     }
