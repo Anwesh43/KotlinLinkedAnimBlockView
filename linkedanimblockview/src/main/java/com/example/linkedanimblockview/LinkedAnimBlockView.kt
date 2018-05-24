@@ -8,6 +8,7 @@ import android.content.Context
 import android.view.View
 import android.view.MotionEvent
 import android.graphics.*
+import java.util.*
 
 class LinkedAnimBlockView (ctx : Context) : View(ctx) {
 
@@ -72,6 +73,50 @@ class LinkedAnimBlockView (ctx : Context) : View(ctx) {
             if (animated) {
                 animated = false
             }
+        }
+    }
+
+    data class LABNode(var i : Int, val state : State = State()) {
+
+        var next : LABNode? = null
+
+        var prev : LABNode? = null
+
+        var cb : ((Canvas, Paint) -> Unit)? = null
+        fun addNeighbor(cbs : List<(Canvas, Paint) -> Unit>) {
+            takeIf{cbs.size > 0}.apply {
+                cb = cbs[0]
+                takeIf { cbs.size > 1 }.apply {
+                    next = LABNode(i +1)
+                    next?.prev = this
+                    next?.addNeighbor(cbs.subList(1, cbs.size))
+                }
+            }
+        }
+
+        fun update(stopcb : (Float) -> Unit) {
+            state.update(stopcb)
+        }
+
+
+        fun startUpdating(startcb : () -> Unit) {
+            state.startUpdating(startcb)
+        }
+
+        fun draw(canvas : Canvas, paint : Paint) {
+            cb?.invoke(canvas, paint)
+        }
+
+        fun getNext(dir : Int, cb : () -> Unit) : LABNode {
+            var curr : LABNode? = prev
+            if (dir == 1) {
+                curr = next
+            }
+            if (curr != null) {
+                return curr
+            }
+            cb()
+            return this
         }
     }
 }
